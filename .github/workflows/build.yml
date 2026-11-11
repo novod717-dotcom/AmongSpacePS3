@@ -1,0 +1,70 @@
+
+name: Build Among Space PS3
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar projeto
+        uses: actions/checkout@v4
+
+      - name: Extrair projeto
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip
+          mkdir extracted
+          unzip -q AmongSpacePS3_corrigido.zip -d extracted
+          MAIN_C=$(find extracted -type f -path '*/src/main.c' | head -n 1)
+          test -n "$MAIN_C"
+          PROJECT_DIR="${MAIN_C%/src/main.c}"
+          cp -a "$PROJECT_DIR"/. .
+
+      - name: Preparar ambiente PS3
+        run: docker pull hldtux/ps3dev-sdl2
+
+      - name: Compilar jogo e gerar PKG
+        run: |
+          docker run --rm --platform linux/amd64 \
+            -v "$GITHUB_WORKSPACE:/build" \
+            -w /build \
+            hldtux/ps3dev-sdl2 bash -lc '
+              set -e
+              CONTENT_ID=UP0001-ASPC00001_00-0000000000000000
+              mkdir -p build/pkg/USRDIR
+
+              ppu-gcc src/main.c -o build/among-space.elf \
+                -mcpu=cell \
+                -I/usr/local/ps3dev/ppu/include \
+                -I/usr/local/ps3dev/portlibs/ppu/include \
+                -I/usr/local/ps3dev/portlibs/ppu/include/SDL2 \
+                -L/usr/local/ps3dev/portlibs/ppu/lib \
+                -L/usr/local/ps3dev/spu/spu/lib \
+                -L/usr/local/ps3dev/ppu/powerpc64-ps3-elf/lib \
+                -lSDL2 -lm -lgcm_sys -lrsx -lsysutil -lrt -llv2 -lio -laudio
+
+              cp assets/ICON0.PNG build/pkg/ICON0.PNG
+
+              make_self_npdrm build/among-space.elf \
+                build/pkg/USRDIR/EBOOT.BIN "$CONTENT_ID"
+
+              sfo.py --title "Among Space PS3" \
+                --appid ASPC00001 \
+                -f /usr/local/ps3dev/bin/sfo.xml \
+                build/pkg/PARAM.SFO
+
+              pkg.py --contentid "$CONTENT_ID" \
+                build/pkg/ build/among-space.pkg
+            '
+
+      - name: Disponibilizar PKG
+        uses: actions/upload-artifact@v4
+        with:
+          name: AmongSpacePS3-PKG
+          path: build/among-space.pkg
+          
