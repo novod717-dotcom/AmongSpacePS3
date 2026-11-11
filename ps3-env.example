@@ -1,0 +1,6 @@
+# Copie/adapte estas variaveis no ambiente Linux/WSL:
+export PS3DEV=/usr/local/ps3dev
+export PSL1GHT=$PS3DEV
+export PATH="$PS3DEV/bin:$PS3DEV/ppu/bin:$PS3DEV/spu/bin:$PATH"
+# Ajuste para onde a SDL2 de PPU estiver instalada:
+export SDL2_PREFIX="$PS3DEV/portlibs/ppu"

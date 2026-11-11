@@ -1,0 +1,52 @@
+# Compilacao e empacotamento PS3 usando PS3DEV/PSL1GHT.
+# Requer SDL2 ja compilado para PS3 e instalado em SDL2_PREFIX.
+PS3DEV ?= /usr/local/ps3dev
+PSL1GHT ?= $(PS3DEV)
+SDL2_PREFIX ?= $(PS3DEV)/portlibs/ppu
+APPID ?= ASPC00001
+TITLE ?= Among Space PS3
+CONTENTID ?= UP0001-$(APPID)_00-0000000000000000
+TARGET ?= among-space
+BUILD := build
+ELF := $(BUILD)/$(TARGET).elf
+PKGDIR := $(BUILD)/pkg
+ICON := assets/ICON0.PNG
+SFOXML := $(PS3DEV)/bin/sfo.xml
+
+CC := $(PS3DEV)/bin/ppu-gcc
+SELF_NPDRM := $(PS3DEV)/bin/make_self_npdrm
+SFO := $(PS3DEV)/bin/sfo
+PKG := $(PS3DEV)/bin/make_package_npdrm
+
+CFLAGS := -O2 -Wall -Wextra -std=c11 -I$(SDL2_PREFIX)/include
+LDFLAGS := -L$(SDL2_PREFIX)/lib -lSDL2 -lm
+
+.PHONY: all check pkg clean
+all: $(ELF)
+
+check:
+	@test -x "$(CC)" || (echo "ERRO: ppu-gcc nao encontrado em $(CC). Instale PS3DEV/PSL1GHT."; exit 1)
+	@test -x "$(SELF_NPDRM)" || (echo "ERRO: make_self_npdrm nao encontrado."; exit 1)
+	@test -x "$(SFO)" || (echo "ERRO: ferramenta sfo nao encontrada."; exit 1)
+	@test -x "$(PKG)" || (echo "ERRO: make_package_npdrm nao encontrado."; exit 1)
+	@test -f "$(SFOXML)" || (echo "ERRO: sfo.xml nao encontrado em $(SFOXML)."; exit 1)
+	@test -f "$(ICON)" || (echo "ERRO: ICON0.PNG nao encontrado."; exit 1)
+	@test -f "$(SDL2_PREFIX)/include/SDL2/SDL.h" -o -f "$(SDL2_PREFIX)/include/SDL.h" || (echo "ERRO: headers SDL2 para PS3 nao encontrados em $(SDL2_PREFIX)."; exit 1)
+
+$(BUILD):
+	mkdir -p $(BUILD)
+
+$(ELF): src/main.c | $(BUILD) check
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+
+pkg: $(ELF)
+	rm -rf $(PKGDIR)
+	mkdir -p $(PKGDIR)/USRDIR
+	cp "$(ICON)" $(PKGDIR)/ICON0.PNG
+	$(SELF_NPDRM) $(ELF) $(PKGDIR)/USRDIR/EBOOT.BIN $(CONTENTID)
+	$(SFO) --title "$(TITLE)" --appid "$(APPID)" -f "$(SFOXML)" $(PKGDIR)/PARAM.SFO
+	$(PKG) --contentid $(CONTENTID) $(PKGDIR)/ $(BUILD)/$(TARGET).pkg
+	@echo "PKG criado: $(BUILD)/$(TARGET).pkg"
+
+clean:
+	rm -rf $(BUILD) src/*.o

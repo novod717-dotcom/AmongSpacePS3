@@ -1,0 +1,1 @@
+Código original deste protótipo para uso e modificação. SDL2, PS3DEV e PSL1GHT são projetos separados e mantêm suas próprias licenças.
